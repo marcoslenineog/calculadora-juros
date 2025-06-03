@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Simulador de Financiamento — IPCA & Juros</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;padding:1.5rem;line-height:1.4}
+    h1{font-size:1.5rem;margin-bottom:1rem}
+    label{display:block;margin:0.5rem 0}
+    input,select{width:100%;padding:0.4rem;border:1px solid #ccc;border-radius:4px}
+    button{padding:0.6rem 1.2rem;margin-top:0.8rem;border:none;border-radius:4px;background:#0b74de;color:#fff;font-weight:bold;cursor:pointer}
+    button:hover{opacity:.9}
+    table{width:100%;border-collapse:collapse;margin-top:1.2rem;font-size:.9rem}
+    th,td{border:1px solid #ddd;padding:0.35rem;text-align:right}
+    th{text-align:left;background:#f4f4f4}
+  </style>
+</head>
+<body>
+  <h1>Simulador de Parcelas — Imóvel</h1>
+
+  <label>Valor financiado (R$):
+    <input type="number" id="principal" value="1300000" step="1000" />
+  </label>
+
+  <label>Número de parcelas:
+    <input type="number" id="months" value="12" step="1" />
+  </label>
+
+  <label>Juros mensais (%):
+    <input type="number" id="rate" value="1.00" step="0.01" />
+  </label>
+
+  <label>IPCA acumulado (%):
+    <input type="number" id="ipca" value="5.53" step="0.01" />
+  </label>
+
+  <label><input type="checkbox" id="applyIpca" /> Aplicar correção IPCA na última parcela</label>
+
+  <label>Sistema de amortização:
+    <select id="system">
+      <option value="PRICE">Price (prestação constante)</option>
+      <option value="SAC">SAC (amortização constante)</option>
+    </select>
+  </label>
+
+  <button onclick="calculate()">Calcular</button>
+
+  <div id="summary"></div>
+  <div id="schedule"></div>
+
+<script>
+function pmt(rate, nper, pv){
+  return pv * rate / (1 - Math.pow(1+rate, -nper));
+}
+function formatMoney(x){
+  return x.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function calculate(){
+  const principal=parseFloat(document.getElementById('principal').value);
+  const months=parseInt(document.getElementById('months').value);
+  const ratePercent=parseFloat(document.getElementById('rate').value);
+  const rate=ratePercent/100;
+  const ipcaPercent=parseFloat(document.getElementById('ipca').value);
+  const applyIpca=document.getElementById('applyIpca').checked;
+  const system=document.getElementById('system').value;
+  let summaryHTML='';
+  let scheduleHTML='';
+  if(system==='PRICE'){
+    const parcela=pmt(rate,months,principal);
+    let saldo=principal;
+    let total=0;
+    scheduleHTML='<table><thead><tr><th>Parcela</th><th>Saldo Início</th><th>Juros</th><th>Amortização</th><th>Prestação</th></tr></thead><tbody>';
+    for(let i=1;i<=months;i++){
+      const juros=saldo*rate;
+      const amort=parcela-juros;
+      let prest=parcela;
+      if(applyIpca && i===months){
+        prest+=principal*ipcaPercent/100;
+      }
+      scheduleHTML+=`<tr><td>${i}</td><td>${formatMoney(saldo)}</td><td>${formatMoney(juros)}</td><td>${formatMoney(amort)}</td><td>${formatMoney(prest)}</td></tr>`;
+      saldo-=amort;
+      total+=prest;
+    }
+    scheduleHTML+='</tbody></table>';
+    summaryHTML=`<p><strong>Prestação constante:</strong> R$ ${formatMoney(parcela)}${applyIpca?' (+ correção na última)':''}</p><p><strong>Total pago:</strong> R$ ${formatMoney(total)}</p>`;
+  } else {
+    const amort=principal/months;
+    let saldo=principal;
+    let total=0, primeiro=0, ultimo=0;
+    scheduleHTML='<table><thead><tr><th>Parcela</th><th>Saldo Início</th><th>Juros</th><th>Amortização</th><th>Prestação</th></tr></thead><tbody>';
+    for(let i=1;i<=months;i++){
+      const juros=saldo*rate;
+      let prest=amort+juros;
+      if(applyIpca && i===months){
+        prest+=principal*ipcaPercent/100;
+      }
+      if(i===1) primeiro=prest;
+      if(i===months) ultimo=prest;
+      scheduleHTML+=`<tr><td>${i}</td><td>${formatMoney(saldo)}</td><td>${formatMoney(juros)}</td><td>${formatMoney(amort)}</td><td>${formatMoney(prest)}</td></tr>`;
+      saldo-=amort;
+      total+=prest;
+    }
+    scheduleHTML+='</tbody></table>';
+    summaryHTML=`<p><strong>Primeira parcela:</strong> R$ ${formatMoney(primeiro)}</p><p><strong>Última parcela:</strong> R$ ${formatMoney(ultimo)}</p><p><strong>Total pago:</strong> R$ ${formatMoney(total)}</p>`;
+  }
+  document.getElementById('summary').innerHTML=summaryHTML;
+  document.getElementById('schedule').innerHTML=scheduleHTML;
+}
+</script>
+
+</body>
+</html>
